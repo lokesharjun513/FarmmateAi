@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+
+.venv/
+.env
+
+# Firebase Admin service account credentials
+firebase-service-account*.json
+*-firebase-adminsdk-*.json
+
+.pytest_cache/
+
+.vscode/
+.idea/
+
+.coverage
+htmlcov/
