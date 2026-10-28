@@ -9,6 +9,8 @@ from app.modules.chat.models import (
 )
 
 
+from uuid import UUID
+
 #
 # Chat
 #
@@ -19,6 +21,7 @@ class ChatRequest(BaseModel):
         min_length=1,
         max_length=2000,
     )
+    farm_id: UUID
 
 
 class ChatResponse(BaseModel):

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -79,23 +80,13 @@ class LocationService {
     }
 
     // ----------------------------------------------------------
-    // Permission denied
+    // Permission denied / Permanently denied
     // ----------------------------------------------------------
 
-    if (permission == LocationPermission.denied) {
-      throw Exception(
-        'Location permission denied. Please allow location access.',
-      );
-    }
-
-    // ----------------------------------------------------------
-    // Permanently denied
-    // ----------------------------------------------------------
-
-    if (permission == LocationPermission.deniedForever) {
-      throw Exception(
-        'Location permission is permanently denied. Please enable it from device settings.',
-      );
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      debugPrint('Location permission denied: $permission');
+      return null;
     }
 
     // ----------------------------------------------------------

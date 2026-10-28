@@ -81,24 +81,15 @@ class LocationService {
       }
 
       // --------------------------------------------------------
-      // PERMISSION DENIED
+      // PERMISSION DENIED / PERMANENTLY DENIED
       // --------------------------------------------------------
 
-      if (permission == LocationPermission.denied) {
-        throw Exception(
-          'Location permission denied. Please allow location permission.',
-        );
-      }
-
-      // --------------------------------------------------------
-      // PERMISSION PERMANENTLY DENIED
-      // --------------------------------------------------------
-
-      if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-          'Location permission permanently denied. '
-          'Please enable it from device settings.',
-        );
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        // Return null to indicate that location cannot be accessed,
+        // allowing the UI to handle the graceful fallback.
+        debugPrint('Location permission denied: $permission');
+        return null;
       }
 
       // --------------------------------------------------------

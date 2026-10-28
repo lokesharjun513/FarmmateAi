@@ -45,9 +45,7 @@ class WeatherProvider extends ChangeNotifier {
       final location = await _locationService.getCurrentLocation();
 
       if (location == null) {
-        _errorMessage =
-            'Location permission is required to show local weather.';
-
+        _errorMessage = 'Location permission is required.';
         _isLoading = false;
         notifyListeners();
         return;
@@ -66,13 +64,11 @@ class WeatherProvider extends ChangeNotifier {
       // longitude
       // location
       //
-      // We can replace this with the actual village/city later.
-      //
 
       final weather = await _weatherRepository.getCurrentWeather(
         latitude: location.latitude,
         longitude: location.longitude,
-        location: location.locationName,
+        location: location.village ?? 'Unknown Location',
       );
 
       _weather = weather;

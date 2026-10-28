@@ -19,6 +19,10 @@ class Settings(BaseSettings):
         "production",
     ] = "development"
 
+    # Comma-separated list of allowed browser origins.
+    # Localhost origins are always allowed outside of production.
+    ALLOWED_ORIGINS: str = ""
+
     # ==========================
     # Database
     # ==========================

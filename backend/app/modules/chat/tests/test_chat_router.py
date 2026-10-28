@@ -148,7 +148,8 @@ def test_ask_fm_success(
     response = client.post(
         "/ask-fm",
         json={
-            "message": "Should I irrigate my rice field today?"
+            "message": "Should I irrigate my rice field today?",
+            "farm_id": str(uuid4())
         },
     )
 
@@ -187,7 +188,8 @@ def test_ask_fm_farmer_not_found(
     response = client.post(
         "/ask-fm",
         json={
-            "message": "How is my crop?"
+            "message": "How is my crop?",
+            "farm_id": str(uuid4())
         },
     )
 
@@ -213,7 +215,8 @@ def test_ask_fm_empty_message(
     response = client.post(
         "/ask-fm",
         json={
-            "message": ""
+            "message": "",
+            "farm_id": str(uuid4())
         },
     )
 
@@ -252,7 +255,8 @@ def test_ask_fm_message_max_length(
     response = client.post(
         "/ask-fm",
         json={
-            "message": "A" * 2000
+            "message": "A" * 2000,
+            "farm_id": str(uuid4())
         },
     )
 

@@ -309,6 +309,7 @@ def test_ask_fm_generates_answer_from_provider(
         "/api/v1/ask-fm",
         json={
             "message": "Hi",
+            "farm_id": str(uuid4()),
         },
     )
 
@@ -379,6 +380,7 @@ def test_ask_fm_returns_bad_gateway_on_provider_failure(
         "/api/v1/ask-fm",
         json={
             "message": "Hi",
+            "farm_id": str(uuid4()),
         },
     )
 
@@ -426,6 +428,7 @@ def test_ask_fm_returns_bad_gateway_on_empty_provider_content(
         "/api/v1/ask-fm",
         json={
             "message": "Hi",
+            "farm_id": str(uuid4()),
         },
     )
 

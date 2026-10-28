@@ -75,7 +75,14 @@ class _AskFMScreenState extends State<AskFMScreen> {
   }
 
   Future<void> _sendMessage({String? retryText}) async {
-    if (_isSending || _selectedFarm == null) {
+    if (_isSending) {
+      return;
+    }
+
+    if (_selectedFarm == null) {
+      setState(() {
+        _errorMessage = 'Please select a farm before asking a question.';
+      });
       return;
     }
 

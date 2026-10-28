@@ -191,7 +191,7 @@ class CropProvider extends ChangeNotifier {
 
       _farms = farms;
 
-      if (successfulFarms > 0 || _hasLoaded) {
+      if (farms.isEmpty || successfulFarms > 0 || _hasLoaded) {
         _groups = groups;
         _crops = groups.expand((group) => group.crops).toList(growable: false);
         _hasLoaded = true;

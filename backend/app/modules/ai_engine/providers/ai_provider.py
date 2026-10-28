@@ -10,6 +10,10 @@ class AIProviderError(RuntimeError):
     """
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AIProvider(BaseAIProvider):
 
     async def generate(
@@ -86,7 +90,10 @@ class AIProvider(BaseAIProvider):
             ) from exc
 
         except httpx.HTTPStatusError as exc:
-
+            logger.error(
+                "AI provider returned HTTP %s",
+                exc.response.status_code,
+            )
             raise AIProviderError(
                 f"AI provider returned HTTP "
                 f"{exc.response.status_code}."

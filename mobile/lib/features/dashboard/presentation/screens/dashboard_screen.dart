@@ -41,6 +41,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _refresh() async {
+    // ----------------------------------------------------------
+    // Update weather location state on the backend first
+    // ----------------------------------------------------------
+
+    await context.read<WeatherProvider>().loadCurrentWeather();
+
+    // ----------------------------------------------------------
+    // Refresh the dashboard
+    // ----------------------------------------------------------
+
     await _loadDashboard(forceRefresh: true);
   }
 
@@ -487,9 +497,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 18),
 
           if (unavailable)
-            const Text(
-              'Weather information is currently unavailable.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Weather information is currently unavailable.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _refresh,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 0),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Try Again',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             )
           else
             Row(
