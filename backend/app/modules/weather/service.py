@@ -1,11 +1,16 @@
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.modules.weather.cache import (
     WeatherCache,
     build_weather_cache_key,
     default_weather_cache,
 )
-from app.modules.weather.provider import WeatherProvider
+from app.modules.weather.provider import (
+    WEATHERAPI_TO_WMO,
+    WeatherProvider,
+)
 from app.modules.weather.location_provider import LocationProvider
 from app.modules.weather.schemas import (
     CurrentWeatherResponse,
@@ -96,82 +101,66 @@ class WeatherService:
         )
 
         current = weather_data.get("current", {})
-        daily = weather_data.get("daily", {})
+        condition = current.get("condition") or {}
+
+        forecast = weather_data.get("forecast", {})
+        forecastday = forecast.get("forecastday") or []
+        first_day = forecastday[0] if forecastday else {}
+        day = first_day.get("day") or {}
+        astro = first_day.get("astro") or {}
+        api_location = weather_data.get("location") or {}
 
         # ------------------------------------------------------
-        # 3. Weather values
+        # 3. Location
         # ------------------------------------------------------
 
-        temperature = float(
-            current.get("temperature_2m", 0)
-        )
+        # Preserve the existing location-name behavior (reverse
+        # geocoding via Nominatim). Only when that lookup degraded
+        # to the "Current Location" placeholder do we use the
+        # provider's own place name instead.
+        if resolved_location == "Current Location":
+            api_name = api_location.get("name")
 
-        feels_like = current.get(
-            "apparent_temperature"
-        )
+            if isinstance(api_name, str) and api_name.strip():
+                resolved_location = api_name.strip()
 
-        humidity = current.get(
-            "relative_humidity_2m"
-        )
+        # ------------------------------------------------------
+        # 4. Current conditions (units match the existing contract:
+        #    C, C, %, km/h, hPa, km, uv index, mm)
+        # ------------------------------------------------------
 
-        wind_speed = float(
-            current.get("wind_speed_10m", 0)
-        )
+        temperature = float(current["temp_c"])
+        wind_speed = float(current["wind_kph"])
 
-        pressure = current.get(
-            "surface_pressure"
-        )
-
-        precipitation = current.get(
-            "precipitation"
-        )
-
+        api_code = condition.get("code")
         weather_code = int(
-            current.get("weather_code", 0)
+            WEATHERAPI_TO_WMO.get(api_code, api_code)
+        )
+
+        weather_condition = condition["text"].strip()
+
+        # ------------------------------------------------------
+        # 5. Sunrise / sunset (timezone-aware ISO 8601)
+        # ------------------------------------------------------
+
+        # WeatherAPI returns astro times as "hh:mm AM/PM" strings in
+        # the location's timezone (location.tz_id, IANA). Combine with
+        # the forecast date to build an aware datetime; if any piece
+        # is missing or unparseable, serve None rather than guessing.
+        sunrise = self._parse_astro_time(
+            first_day.get("date"),
+            astro.get("sunrise"),
+            api_location.get("tz_id"),
+        )
+
+        sunset = self._parse_astro_time(
+            first_day.get("date"),
+            astro.get("sunset"),
+            api_location.get("tz_id"),
         )
 
         # ------------------------------------------------------
-        # 4. Weather condition
-        # ------------------------------------------------------
-
-        weather_condition = self._get_weather_condition(
-            weather_code
-        )
-
-        # ------------------------------------------------------
-        # 5. Rain probability
-        # ------------------------------------------------------
-
-        rain_probability = None
-
-        precipitation_probability = daily.get(
-            "precipitation_probability_max"
-        )
-
-        if (
-            isinstance(precipitation_probability, list)
-            and precipitation_probability
-        ):
-            rain_probability = precipitation_probability[0]
-
-        # ------------------------------------------------------
-        # 6. Sunrise / sunset
-        # ------------------------------------------------------
-
-        sunrise = None
-        sunset = None
-
-        sunrise_values = daily.get("sunrise")
-        sunset_values = daily.get("sunset")
-
-        if isinstance(sunrise_values, list) and sunrise_values:
-            sunrise = sunrise_values[0]
-
-        if isinstance(sunset_values, list) and sunset_values:
-            sunset = sunset_values[0]
-
-        # ------------------------------------------------------
-        # 7. Return response
+        # 6. Return response
         # ------------------------------------------------------
 
         return CurrentWeatherResponse(
@@ -179,70 +168,60 @@ class WeatherService:
             latitude=latitude,
             longitude=longitude,
             temperature=temperature,
-            feels_like=feels_like,
-            humidity=humidity,
+            feels_like=self._opt_float(current.get("feelslike_c")),
+            humidity=self._opt_int(current.get("humidity")),
             wind_speed=wind_speed,
-            pressure=pressure,
-            visibility=None,
-            uv_index=None,
-            precipitation=precipitation,
+            pressure=self._opt_float(current.get("pressure_mb")),
+            visibility=self._opt_float(current.get("vis_km")),
+            uv_index=self._opt_float(current.get("uv")),
+            precipitation=self._opt_float(current.get("precip_mm")),
             weather_code=weather_code,
             weather_condition=weather_condition,
-            rain_probability=rain_probability,
+            rain_probability=self._opt_int(
+                day.get("daily_chance_of_rain")
+            ),
             sunrise=sunrise,
             sunset=sunset,
         )
 
     @staticmethod
-    def _get_weather_condition(
-        weather_code: int,
-    ) -> str:
+    def _opt_float(value) -> float | None:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        return None
 
-        weather_conditions = {
-            0: "Clear Sky",
-            1: "Mainly Clear",
-            2: "Partly Cloudy",
-            3: "Overcast",
+    @staticmethod
+    def _opt_int(value) -> int | None:
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return int(round(float(value)))
+        return None
 
-            45: "Fog",
-            48: "Depositing Rime Fog",
+    @staticmethod
+    def _parse_astro_time(
+        date_str: str | None,
+        time_str: str | None,
+        tz_id: str | None,
+    ) -> datetime | None:
 
-            51: "Light Drizzle",
-            53: "Moderate Drizzle",
-            55: "Dense Drizzle",
+        if not date_str or not time_str or not tz_id:
+            return None
 
-            56: "Light Freezing Drizzle",
-            57: "Dense Freezing Drizzle",
+        try:
+            date_part = datetime.strptime(
+                str(date_str),
+                "%Y-%m-%d",
+            ).date()
 
-            61: "Slight Rain",
-            63: "Moderate Rain",
-            65: "Heavy Rain",
+            time_part = datetime.strptime(
+                str(time_str).strip(),
+                "%I:%M %p",
+            ).time()
 
-            66: "Light Freezing Rain",
-            67: "Heavy Freezing Rain",
+            tz = ZoneInfo(str(tz_id))
+        except (TypeError, ValueError, ZoneInfoNotFoundError):
+            return None
 
-            71: "Slight Snow",
-            73: "Moderate Snow",
-            75: "Heavy Snow",
-
-            77: "Snow Grains",
-
-            80: "Slight Rain Showers",
-            81: "Moderate Rain Showers",
-            82: "Violent Rain Showers",
-
-            85: "Slight Snow Showers",
-            86: "Heavy Snow Showers",
-
-            95: "Thunderstorm",
-            96: "Thunderstorm with Slight Hail",
-            99: "Thunderstorm with Heavy Hail",
-        }
-
-        return weather_conditions.get(
-            weather_code,
-            "Unknown",
-        )
+        return datetime.combine(date_part, time_part, tzinfo=tz)
 
     async def get_weather_recommendation(
         self,

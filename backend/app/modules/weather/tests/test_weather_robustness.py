@@ -1,9 +1,10 @@
-# Tests for the weather caching/retry robustness work:
-# provider bounded retries + Retry-After, TTL cache freshness,
-# concurrent deduplication, bounded stale-cache fallback, and the
-# HTTP 503 surface for upstream weather failure.
+# Tests for the weather robustness work:
+# provider bounded retries + Retry-After, credential/malformed
+# handling, TTL cache freshness, concurrent deduplication, bounded
+# stale-cache fallback, and the HTTP 503 surface for upstream failure.
 
 import asyncio
+import logging
 
 import httpx
 import pytest
@@ -26,7 +27,7 @@ from app.modules.weather.service import WeatherResult
 
 
 # ============================================================
-# WeatherProvider: bounded retries / Retry-After
+# WeatherProvider: bounded retries / Retry-After / errors
 # ============================================================
 
 class FakeSleep:
@@ -43,8 +44,25 @@ class FakeSleep:
         self.sleeps.append(delay)
 
 
-def make_provider(handler):
-    return WeatherProvider(transport=httpx.MockTransport(handler))
+def valid_payload():
+    return {
+        "location": {"name": "Nellore", "tz_id": "Asia/Kolkata"},
+        "current": {
+            "temp_c": 32.5,
+            "wind_kph": 12.0,
+            "condition": {"code": 1000, "text": "Sunny"},
+        },
+        "forecast": {
+            "forecastday": [{"date": "2026-11-23"}]
+        },
+    }
+
+
+def make_provider(handler, api_key="test-key"):
+    return WeatherProvider(
+        transport=httpx.MockTransport(handler),
+        api_key=api_key,
+    )
 
 
 def json_response(status_code, payload=None, headers=None):
@@ -56,17 +74,83 @@ def json_response(status_code, payload=None, headers=None):
 
 
 @pytest.mark.asyncio
-async def test_provider_success(monkeypatch):
-    provider = make_provider(
-        lambda request: json_response(
-            200,
-            {"current": {"temperature_2m": 32.5}},
-        )
-    )
+async def test_provider_success_builds_request(monkeypatch):
+    captured = {}
+
+    def handler(request):
+        captured["params"] = dict(request.url.params)
+        return json_response(200, valid_payload())
+
+    provider = make_provider(handler)
 
     data = await provider.get_current_weather(14.4, 79.9)
 
-    assert data["current"]["temperature_2m"] == 32.5
+    assert data["current"]["temp_c"] == 32.5
+
+    # Forecast endpoint contract: days=1, aqi=no, alerts=no,
+    # q=latitude,longitude, key passed as query parameter.
+    assert captured["params"]["days"] == "1"
+    assert captured["params"]["aqi"] == "no"
+    assert captured["params"]["alerts"] == "no"
+    assert captured["params"]["q"] == "14.4,79.9"
+    assert captured["params"]["key"] == "test-key"
+
+
+@pytest.mark.asyncio
+async def test_provider_missing_key_raises_without_calling_upstream(monkeypatch):
+    monkeypatch.setattr(
+        "app.modules.weather.provider.settings.WEATHERAPI_API_KEY",
+        None,
+    )
+
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return json_response(200, valid_payload())
+
+    provider = make_provider(handler, api_key=None)
+
+    with pytest.raises(WeatherUpstreamUnavailableError):
+        await provider.get_current_weather(14.4, 79.9)
+
+    assert calls["n"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status_code", [401, 403])
+async def test_provider_auth_rejection_not_retried(monkeypatch, status_code):
+    calls = {"n": 0}
+    FakeSleep(monkeypatch)
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(status_code)
+
+    provider = make_provider(handler)
+
+    with pytest.raises(WeatherUpstreamUnavailableError):
+        await provider.get_current_weather(14.4, 79.9)
+
+    assert calls["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_api_key_never_logged(monkeypatch, caplog):
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(401)
+
+    provider = make_provider(handler)
+
+    with caplog.at_level(logging.WARNING, logger="farmmate"):
+        with pytest.raises(WeatherUpstreamUnavailableError):
+            await provider.get_current_weather(14.4, 79.9)
+
+    assert calls["n"] == 1
+    assert "test-key" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -78,7 +162,7 @@ async def test_provider_429_respects_retry_after(monkeypatch):
         calls["n"] += 1
         if calls["n"] == 1:
             return json_response(429, headers={"Retry-After": "2"})
-        return json_response(200, {"current": {}})
+        return json_response(200, valid_payload())
 
     provider = make_provider(handler)
 
@@ -116,7 +200,7 @@ async def test_provider_429_retry_after_clamped(monkeypatch):
         if calls["n"] == 1:
             # Absurdly long Retry-After must be clamped.
             return json_response(429, headers={"Retry-After": "3600"})
-        return json_response(200, {"current": {}})
+        return json_response(200, valid_payload())
 
     provider = make_provider(handler)
 
@@ -134,7 +218,7 @@ async def test_provider_5xx_retries_once(monkeypatch):
         calls["n"] += 1
         if calls["n"] == 1:
             return json_response(500)
-        return json_response(200, {"current": {}})
+        return json_response(200, valid_payload())
 
     provider = make_provider(handler)
 
@@ -194,6 +278,87 @@ async def test_provider_transport_error_bounded(monkeypatch):
 
     assert calls["n"] == 2
     assert fake_sleep.sleeps == [1.0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        # Not an object at all.
+        [1],
+        # Missing required current fields / malformed condition.
+        {"current": {}},
+        {
+            "current": {
+                "temp_c": 30,
+                "condition": {"code": 1000, "text": "Sunny"},
+            }
+        },
+        {
+            "current": {
+                "temp_c": 30,
+                "wind_kph": 10,
+                "condition": {"code": 1000, "text": ""},
+            }
+        },
+        {
+            "current": {
+                "temp_c": 30,
+                "wind_kph": 10,
+                "condition": {"code": "x", "text": "Sunny"},
+            }
+        },
+        # Missing/empty forecast breakdown.
+        {
+            "current": {
+                "temp_c": 30,
+                "wind_kph": 10,
+                "condition": {"code": 1000, "text": "Sunny"},
+            },
+            "forecast": {},
+        },
+        {
+            "current": {
+                "temp_c": 30,
+                "wind_kph": 10,
+                "condition": {"code": 1000, "text": "Sunny"},
+            },
+            "forecast": {"forecastday": []},
+        },
+    ],
+)
+async def test_provider_malformed_payloads_raise_unavailable(
+    monkeypatch,
+    payload,
+):
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return json_response(200, payload)
+
+    provider = make_provider(handler)
+
+    with pytest.raises(WeatherUpstreamUnavailableError):
+        await provider.get_current_weather(14.4, 79.9)
+
+    assert calls["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_non_json_body_raises_unavailable(monkeypatch):
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(200, content=b"<html>oops</html>")
+
+    provider = make_provider(handler)
+
+    with pytest.raises(WeatherUpstreamUnavailableError):
+        await provider.get_current_weather(14.4, 79.9)
+
+    assert calls["n"] == 1
 
 
 # ============================================================

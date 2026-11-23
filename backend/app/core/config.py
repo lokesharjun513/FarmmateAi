@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     CROP_PLAN_MAX_TOKENS: int = 6000
 
     # ==========================
+    # Weather (WeatherAPI.com)
+    # ==========================
+
+    # API key for https://www.weatherapi.com/ (forecast API).
+    # Read from the WEATHERAPI_API_KEY environment variable only.
+    WEATHERAPI_API_KEY: SecretStr | None = None
+
+    # ==========================
     # Firebase Admin
     # ==========================
 
