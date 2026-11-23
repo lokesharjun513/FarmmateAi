@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Network access (required for API calls in release builds) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="mobile"
         android:name="${applicationName}"

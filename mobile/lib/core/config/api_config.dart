@@ -4,17 +4,33 @@ class ApiConfig {
   ApiConfig._();
 
   // === Authentication ===
-  // Override per run: --dart-define=API_BASE_URL=http://<host>:8000/api/v1
-  // (required for physical Android/iOS devices on Wi-Fi).
+  // Override per run: --dart-define=API_BASE_URL=http://<host>:8000
+  // (required for physical Android/iOS devices on Wi-Fi). Pass the host
+  // WITHOUT a path — /api/v1 is appended automatically by [normalizeBaseUrl].
   // Defaults: web/desktop/iOS simulator use 127.0.0.1; the Android emulator
   // reaches the host machine's localhost via 10.0.2.2.
   static String get baseUrl {
     const override = String.fromEnvironment('API_BASE_URL');
-    if (override.isNotEmpty) return override;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api/v1';
+    final raw = override.isNotEmpty
+        ? override
+        : (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+            ? 'http://10.0.2.2:8000'
+            : 'http://127.0.0.1:8000';
+    return normalizeBaseUrl(raw);
+  }
+
+  /// Ensures the API base URL ends in exactly one `/api/v1` prefix.
+  /// Strips trailing slashes and leaves already-prefixed URLs unchanged.
+  @visibleForTesting
+  static String normalizeBaseUrl(String url) {
+    var trimmed = url.trim();
+    while (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
     }
-    return 'http://127.0.0.1:8000/api/v1';
+    if (!trimmed.toLowerCase().endsWith('/api/v1')) {
+      trimmed = '$trimmed/api/v1';
+    }
+    return trimmed;
   }
 
 
