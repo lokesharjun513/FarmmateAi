@@ -90,11 +90,14 @@ class LocationService {
     }
 
     // ----------------------------------------------------------
-    // Get GPS position
+    // Get GPS position with timeout
     // ----------------------------------------------------------
 
     final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 15),
+      ),
     );
 
     // ----------------------------------------------------------

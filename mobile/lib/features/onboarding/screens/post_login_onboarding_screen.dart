@@ -457,7 +457,7 @@ class _PostLoginOnboardingScreenState extends State<PostLoginOnboardingScreen>
             else if (_locationData != null)
               _buildDetectedLocation(_locationData!)
             else
-              _buildLocationUnavailable(),
+              _buildLocationUnavailableWithErrorActions(),
 
             const SizedBox(height: 18),
 
@@ -665,6 +665,38 @@ class _PostLoginOnboardingScreenState extends State<PostLoginOnboardingScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLocationUnavailableWithErrorActions() {
+    return Column(
+      children: [
+        _buildLocationUnavailable(),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _requestLocation,
+                child: const Text('Try Again'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _step = 1;
+                  });
+                  _restartAnimation();
+                },
+                child: const Text('Continue Without Location'),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
