@@ -190,14 +190,14 @@ class AuthCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardSurface,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.055),
-            blurRadius: 36,
-            spreadRadius: 1,
-            offset: const Offset(0, 18),
+            color: Color(0x0D174D3A),
+            blurRadius: 28,
+            spreadRadius: 0,
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -316,7 +316,31 @@ class AuthPrimaryButton extends StatelessWidget {
                   ),
                 ],
               )
-            : Text(label, key: const ValueKey('auth-label')),
+            : Row(
+                key: const ValueKey('auth-label'),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ],
+              ),
       ),
     );
   }
@@ -361,6 +385,51 @@ class AuthFooter extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Brand Chips ──────────────────────────────────────────────────────
+
+class BrandChips extends StatelessWidget {
+  const BrandChips({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      children: const [
+        _BrandChip(label: 'Farming'),
+        _BrandChip(label: 'Intelligence'),
+        _BrandChip(label: 'Simplicity'),
+      ],
+    );
+  }
+}
+
+class _BrandChip extends StatelessWidget {
+  const _BrandChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.textHint,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.4,
+        ),
+      ),
     );
   }
 }

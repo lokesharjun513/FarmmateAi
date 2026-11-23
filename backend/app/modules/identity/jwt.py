@@ -11,16 +11,20 @@ from app.core.config import settings
 # ============================================================
 
 
-def create_token_payload(user_id: str) -> dict:
-    """
-    Create the payload used for an access token.
+def create_token_payload(user_id: str, *, type: str = "access", minutes: int | None = None) -> dict:
+    """Create the payload used for a JWT token.
+
+    Args:
+        user_id: The user's UUID string.
+        type: Token type ("access" or "password_reset").
+        minutes: Expiry in minutes. If None, uses ACCESS_TOKEN_EXPIRE_MINUTES.
     """
 
     now = datetime.now(UTC)
 
-    expire = now + timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
-    )
+    expire_minutes = minutes if minutes is not None else settings.ACCESS_TOKEN_EXPIRE_MINUTES
+
+    expire = now + timedelta(minutes=expire_minutes)
 
     return {
         # ----------------------------------------------------
@@ -54,7 +58,7 @@ def create_token_payload(user_id: str) -> dict:
         # can authenticate API requests.
         # ----------------------------------------------------
 
-        "type": "access",
+        "type": type,
     }
 
 
@@ -63,15 +67,22 @@ def create_token_payload(user_id: str) -> dict:
 # ============================================================
 
 
-def create_access_token(user_id: str) -> str:
-    """
-    Create a signed JWT access token for a user.
+def create_access_token(user_id: str, *, payload: dict | None = None) -> str:
+    """Create a signed JWT access token for a user.
+
+    Args:
+        user_id: The user's UUID string.
+        payload: Optional custom payload. If None, a default payload
+            is created with access token expiry.
     """
 
-    payload = create_token_payload(user_id)
+    if payload is not None:
+        encoded_payload = payload
+    else:
+        encoded_payload = create_token_payload(user_id)
 
     return jwt.encode(
-        payload,
+        encoded_payload,
         settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
     )
@@ -83,8 +94,7 @@ def create_access_token(user_id: str) -> str:
 
 
 def decode_access_token(token: str) -> dict:
-    """
-    Decode and cryptographically verify an access token.
+    """Decode and cryptographically verify an access token.
 
     Raises:
         ValueError:

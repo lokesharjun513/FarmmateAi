@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/verify_otp_screen.dart';
+import '../../features/auth/presentation/screens/set_new_password_screen.dart';
+import '../../features/auth/presentation/screens/password_changed_screen.dart';
 import '../../features/auth/providers/auth_provider.dart';
 
 import '../../features/dashboard/presentation/screens/main_shell_screen.dart';
@@ -35,6 +39,13 @@ GoRouter createRouter(AuthProvider authProvider) {
       final isLogin = location == '/login';
       final isRegister = location == '/register';
 
+      // Password recovery is reached while logged out, so the recovery
+      // routes are part of the unauthenticated whitelist.
+      final isForgotPassword = location == '/forgot-password' ||
+          location == '/verify-otp' ||
+          location == '/set-new-password' ||
+          location == '/password-changed';
+
       final isOnboarding = location == '/onboarding';
 
       final isDashboard = location == '/dashboard';
@@ -42,7 +53,7 @@ GoRouter createRouter(AuthProvider authProvider) {
       final isAddFarm = location == '/add-farm';
       final isAskFm = location == '/ask-fm';
 
-      final isAuthScreen = isLogin || isRegister;
+      final isAuthScreen = isLogin || isRegister || isForgotPassword;
 
       // ========================================================
       // SPLASH
@@ -218,6 +229,60 @@ GoRouter createRouter(AuthProvider authProvider) {
         path: '/ask-fm',
         builder: (context, state) {
           return const AskFMScreen();
+        },
+      ),
+
+      // ========================================================
+      // FORGOT PASSWORD
+      // ========================================================
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) {
+          final args = state.extra as Map<String, dynamic>?;
+          return ForgotPasswordScreen(
+            initialEmail: args?['email']?.toString() ?? '',
+          );
+        },
+      ),
+
+      // ========================================================
+      // VERIFY OTP
+      // ========================================================
+      GoRoute(
+        path: '/verify-otp',
+        builder: (context, state) {
+          final args = state.extra as Map<String, dynamic>?;
+          return VerifyOtpsScreen(
+            initialEmail: args?['email']?.toString() ?? '',
+          );
+        },
+      ),
+
+      // ========================================================
+      // SET NEW PASSWORD
+      // ========================================================
+      GoRoute(
+        path: '/set-new-password',
+        builder: (context, state) {
+          final args = state.extra as Map<String, dynamic>?;
+          return SetNewPasswordScreen(
+            resetToken: args?['reset_token']?.toString() ?? '',
+            expiresAt: args?['expires_at']?.toString() ?? '',
+            email: args?['email']?.toString() ?? '',
+          );
+        },
+      ),
+
+      // ========================================================
+      // PASSWORD CHANGED
+      // ========================================================
+      GoRoute(
+        path: '/password-changed',
+        builder: (context, state) {
+          final args = state.extra as Map<String, dynamic>?;
+          return PasswordChangedScreen(
+            email: args?['email']?.toString() ?? '',
+          );
         },
       ),
     ],

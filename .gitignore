@@ -5,6 +5,10 @@
 **/.env
 **/.env.*
 !**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
 
 # Python
 __pycache__/
@@ -12,6 +16,8 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 
@@ -23,19 +29,29 @@ htmlcov/
 # Local database and reconciliation files
 backend/reconcile.sql
 
+# Local diagnostics
+backend/logs/
+backend/uploads/
+backend/dist/
+
 # Flutter / Dart generated files
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
 build/
 coverage/
+*.iml
 
 # IDE and OS files
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 .DS_Store
 Thumbs.db
 
 # Logs
 *.log
+*.tmp

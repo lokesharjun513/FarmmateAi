@@ -22,7 +22,7 @@ class AskFmRepository {
         data: {
           'message': trimmedMessage,
           'farm_id': farmId,
-          if (language != null) 'language': language,
+          'language': ?language,
         },
       );
 

@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from pydantic import (
@@ -135,6 +136,66 @@ class TokenData(BaseModel):
     access_token: str
 
     token_type: str = "bearer"
+
+
+# ============================================================
+# FORGOT PASSWORD
+# ============================================================
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    success: bool
+    message: str
+    data: dict[str, Any] # Changed from dict[str, str] to dict[str, Any] to accommodate optional keys
+
+
+# ============================================================
+# VERIFY RESET OTP
+# ============================================================
+
+
+class VerifyResetOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r'^\d{6}$')
+
+
+class VerifyResetOtpResponse(BaseModel):
+    success: bool
+    data: dict[str, str]
+
+
+# ============================================================
+# RESEND RESET OTP
+# ============================================================
+
+
+class ResendResetOtpRequest(BaseModel):
+    email: EmailStr
+
+
+class ResendResetOtpResponse(BaseModel):
+    success: bool
+    message: str
+    data: dict[str, str]
+
+
+# ============================================================
+# RESET PASSWORD
+# ============================================================
+
+
+class ResetPasswordRequest(BaseModel):
+    reset_token: str
+    new_password: str = Field(..., min_length=8)
+
+
+class ResetPasswordResponse(BaseModel):
+    success: bool
+    message: str
 
 
 # ============================================================

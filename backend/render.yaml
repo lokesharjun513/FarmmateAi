@@ -1,0 +1,55 @@
+services:
+  web:
+    type: web
+    name: farmmate-backend
+    runtime: python
+    buildCommand: "pip install uv && uv sync --frozen"
+    startCommand: "uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: "/"
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: "FarmMate AI"
+      - key: APP_VERSION
+        value: "1.0.0"
+      - key: LOG_LEVEL
+        value: INFO
+      # Secrets are prompted at deploy time and never stored in this file.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false
+      - key: AI_API_URL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_KEY_PATH
+        sync: false
+
+# All secrets are declared as Render secret env vars (sync: false) so they are
+# prompted at deploy time and never stored in this file.
+# Set these in the Render dashboard (or via `render blueprint apply`):
+#   DATABASE_URL        — PostgreSQL connection string (external URL recommended)
+#   JWT_SECRET_KEY      — long random string used to sign access/reset tokens
+#   AI_API_URL          — provider base URL (e.g. https://openrouter.ai/api/v1)
+#   AI_API_KEY          — provider API key
+#   AI_MODEL            — model id
+#   SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/SMTP_FROM
+#                       — SMTP for password-reset emails
+#   ALLOWED_ORIGINS     — comma-separated production web origins (e.g. https://farmmate.example.com)
+#   FIREBASE_SERVICE_ACCOUNT_KEY_PATH — optional, path to mounted service account

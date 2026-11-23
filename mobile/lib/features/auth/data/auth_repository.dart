@@ -97,4 +97,46 @@ class AuthRepository {
       throw e.toString();
     }
   }
+
+  // ============================================================
+  // PASSWORD RESET
+  // ============================================================
+
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
+    final response = await _apiClient.dio.post(
+      ApiConfig.forgotPassword,
+      data: {'email': email},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final response = await _apiClient.dio.post(
+      ApiConfig.verifyResetOtp,
+      data: {'email': email, 'otp': otp},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    final response = await _apiClient.dio.post(
+      ApiConfig.resetPassword,
+      data: {'reset_token': resetToken, 'new_password': newPassword},
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> resendResetOtp({required String email}) async {
+    final response = await _apiClient.dio.post(
+      ApiConfig.resendResetOtp,
+      data: {'email': email},
+    );
+    return response.data as Map<String, dynamic>;
+  }
 }

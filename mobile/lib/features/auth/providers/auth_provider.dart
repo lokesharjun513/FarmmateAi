@@ -6,7 +6,19 @@ import '../data/auth_repository.dart';
 import '../data/models/user_model.dart';
 
 // ============================================================
-// AUTH STATUS
+// PASSWORD RESET STATUS
+// ============================================================
+
+enum PasswordResetStatus {
+  initial,
+  sendingOtp,
+  verified,
+  resendingOtp,
+  resetSuccessful,
+}
+
+// ============================================================
+// AUTH PROVIDER
 // ============================================================
 
 enum AuthStatus { initial, loading, unauthenticated, authenticated }
@@ -29,6 +41,9 @@ class AuthProvider extends ChangeNotifier {
 
   bool _hasFarmerProfile = false;
 
+  // In-memory cooldown tracking for OTP resend (per email address)
+  final Map<String, DateTime> _resendCooldownUntil = {};
+
   // ============================================================
   // CONSTRUCTOR
   // ============================================================
@@ -36,10 +51,12 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider({
     AuthRepository? authRepository,
     TokenStorage? tokenStorage,
-    required this._onboardingProvider,
+    required OnboardingProvider onboardingProvider,
     this.onBeforeLogout,
   }) : _authRepository = authRepository ?? AuthRepository(),
-       _tokenStorage = tokenStorage ?? TokenStorage();
+       _tokenStorage = tokenStorage ?? TokenStorage(),
+       // ignore: prefer_initializing_formals
+       _onboardingProvider = onboardingProvider;
 
   // ============================================================
   // GETTERS
@@ -148,10 +165,145 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ============================================================
-  // LOGIN
+  // FORGOT PASSWORD
   // ============================================================
 
-  Future<bool> login({
+  Future<Map<String, dynamic>> forgotPassword({
+    required String email,
+  }) async {
+    _setLoading();
+
+    try {
+      final cleanEmail = email.trim();
+
+      final authResponse =
+          await _authRepository.forgotPassword(email: cleanEmail);
+
+      if (authResponse['success'] == true) {
+        _startResendCooldown(cleanEmail);
+        return authResponse;
+      } else {
+        return authResponse;
+      }
+    } catch (e) {
+      return {'status': 'error', 'detail': 'Something went wrong. Please try again.'};
+    } finally {
+      _clearInMemoryState();
+    }
+  }
+
+  // ============================================================
+  // VERIFY RESET OTP
+  // ============================================================
+
+  Future<Map<String, dynamic>> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    _setLoading();
+
+    try {
+      return await _authRepository.verifyResetOtp(
+        email: email.trim().toLowerCase(),
+        otp: otp,
+      );
+    } catch (e) {
+      return {'status': 'error', 'detail': 'Something went wrong. Please try again.'};
+    } finally {
+      _clearInMemoryState();
+    }
+  }
+
+  // ============================================================
+  // RESET PASSWORD
+  // ============================================================
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    _setLoading();
+
+    try {
+      if (newPassword.trim().length < 8) {
+        _setUnauthenticated(
+          errorMessage: 'Password must be at least 8 characters.',
+        );
+        return {'status': 'error', 'detail': 'Password must be at least 8 characters.'};
+      }
+
+      return await _authRepository.resetPassword(
+        resetToken: resetToken,
+        newPassword: newPassword,
+      );
+    } catch (e) {
+      return {'status': 'error', 'detail': 'Something went wrong. Please try again.'};
+    } finally {
+      _clearInMemoryState();
+    }
+  }
+
+  // ============================================================
+  // RESEND RESET OTP
+  // ============================================================
+
+  Future<Map<String, dynamic>> resendResetOtp({
+    required String email,
+  }) async {
+    _setLoading();
+
+    try {
+      return await _authRepository.resendResetOtp(
+        email: email.trim().toLowerCase(),
+      );
+    } catch (e) {
+      return {'status': 'error', 'detail': 'Something went wrong. Please try again.'};
+    } finally {
+      _clearInMemoryState();
+    }
+  }
+
+  // ============================================================
+  // CAN RESEND RESET OTP
+  // ============================================================
+
+  /// Returns true if no cooldown is active (or cooldown has expired) for
+  /// the given email.  A 60-second cooldown starts after each OTP send.
+  bool canResendResetOtp(String email) {
+    final cooldown = _resendCooldownUntil[email.trim().toLowerCase()];
+    if (cooldown == null) {
+      return true;
+    }
+    return DateTime.now().isAfter(cooldown);
+  }
+
+  // ============================================================
+  // RESEND COOLDOWN TEXT
+  // ============================================================
+
+  /// Human-readable remaining cooldown time for the given email.
+  String resendCooldownText(String email) {
+    final cooldown = _resendCooldownUntil[email.trim().toLowerCase()];
+    if (cooldown == null) {
+      return '';
+    }
+    final remaining = cooldown.difference(DateTime.now()).inSeconds;
+    if (remaining <= 0) {
+      return '';
+    }
+    return '$remaining second${remaining == 1 ? '' : 's'}';
+  }
+
+  void _startResendCooldown(String email) {
+    _resendCooldownUntil[email.trim().toLowerCase()] =
+        DateTime.now().add(const Duration(seconds: 60));
+  }
+
+// ============================================================
+// LOGIN
+// ============================================================
+
+Future<bool> login({
     required String identifier,
     required String password,
   }) async {
@@ -457,8 +609,8 @@ class AuthProvider extends ChangeNotifier {
 
   void _clearInMemoryState() {
     _user = null;
-
     _hasFarmerProfile = false;
+    _status = AuthStatus.unauthenticated;
   }
 
   // ============================================================

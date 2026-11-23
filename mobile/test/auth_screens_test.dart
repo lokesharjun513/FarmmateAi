@@ -50,6 +50,44 @@ class FakeAuthProvider extends ChangeNotifier implements AuthProvider {
   Future<void> checkAuthStatus() async {}
 
   @override
+  Future<Map<String, dynamic>> forgotPassword({
+    required String email,
+  }) async {
+    return {'status': 'success'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> verifyResetOtp({
+    required String email,
+    required String otp,
+  }) async {
+    return otp == '123456'
+        ? {'data': {'reset_authorization': 'token', 'expires_at': 'never'}}
+        : {'status': 'error', 'detail': 'Invalid OTP'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> resetPassword({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    return {'status': 'success'};
+  }
+
+  @override
+  Future<Map<String, dynamic>> resendResetOtp({
+    required String email,
+  }) async {
+    return {'status': 'success'};
+  }
+
+  @override
+  bool canResendResetOtp(String email) => true;
+
+  @override
+  String resendCooldownText(String email) => '';
+
+  @override
   Future<bool> login({
     required String identifier,
     required String password,

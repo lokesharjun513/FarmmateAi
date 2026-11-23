@@ -71,6 +71,16 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # ==========================
+    # SMTP
+    # ==========================
+
+    SMTP_HOST: str
+    SMTP_PORT: int
+    SMTP_USER: str
+    SMTP_PASS: str
+    SMTP_FROM: str
+
+    # ==========================
     # Environment configuration
     # ==========================
 

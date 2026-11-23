@@ -23,39 +23,23 @@ class _LoginScreenState extends State<LoginScreen>
   final _identifierFocusNode = FocusNode();
   final _passwordFocusNode = FocusNode();
 
-  late final AnimationController _animationController;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<Offset> _slideAnimation;
-
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _reduceMotion = false;
+
+  // ─── Animation ────────────────────────────────────────────────────────
+
+  AnimationController? _animationController;
+  Animation<double>? _fadeAnimation;
+  Animation<Offset>? _slideAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 520),
-    );
-
-    _fadeAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0, 0.9, curve: Curves.easeOut),
-    );
-
-    _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.025), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_reduceMotion) {
-        _animationController.forward();
+        // Animation started via didChangeDependencies
       }
     });
   }
@@ -73,22 +57,28 @@ class _LoginScreenState extends State<LoginScreen>
     _reduceMotion = reduceMotion;
 
     if (_reduceMotion) {
-      _animationController.value = 1;
+      // Skip animations when reduced motion is enabled
       return;
     }
+  }
 
-    _animationController.forward();
+  @override
+  void didUpdateWidget(covariant LoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Animation controller managed via didChangeDependencies
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _animationController?.dispose();
     _identifierController.dispose();
     _passwordController.dispose();
     _identifierFocusNode.dispose();
     _passwordFocusNode.dispose();
     super.dispose();
   }
+
+  // ─── Actions ─────────────────────────────────────────────────────────
 
   Future<void> _handleLogin() async {
     if (_isSubmitting) {
@@ -107,13 +97,22 @@ class _LoginScreenState extends State<LoginScreen>
 
     final authProvider = context.read<AuthProvider>();
 
-    var success = false;
-
     try {
-      success = await authProvider.login(
+      await authProvider.login(
         identifier: _identifierController.text.trim(),
         password: _passwordController.text,
       );
+
+      if (!mounted) return;
+
+      if (authProvider.hasFarmerProfile) {
+        context.go('/dashboard');
+      } else {
+        context.go('/onboarding');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // AuthProvider handles error internally
     } finally {
       if (mounted) {
         setState(() {
@@ -121,45 +120,122 @@ class _LoginScreenState extends State<LoginScreen>
         });
       }
     }
-
-    if (!mounted || !success) {
-      return;
-    }
-
-    if (authProvider.hasFarmerProfile) {
-      context.go('/dashboard');
-    } else {
-      context.go('/onboarding');
-    }
   }
 
   void _togglePasswordVisibility() {
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
       _obscurePassword = !_obscurePassword;
     });
   }
 
+  // Returns the identifier trimmed / lowercased only when it looks like an
+  // email. Mobile numbers are deliberately not pre-filled.
+  String? _extractEmail(String identifier) {
+    final clean = identifier.trim();
+
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(clean)
+        ? clean
+        : null;
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final isLoading = _isSubmitting || authProvider.isLoading;
-    final textTheme = Theme.of(context).textTheme;
     final errorMessage = authProvider.errorMessage;
+    final textTheme = Theme.of(context).textTheme;
+
+    // Build animation controller if not created
+    if (_animationController == null) {
+      _animationController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 520),
+      );
+
+      _fadeAnimation = CurvedAnimation(
+        parent: _animationController!,
+        curve: const Interval(0, 0.9, curve: Curves.easeOut),
+      );
+
+      _slideAnimation =
+          Tween<Offset>(
+            begin: const Offset(0, 0.025),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: _animationController!,
+              curve: Curves.easeOutCubic,
+            ),
+          );
+    }
+
+    // Start animation if not in reduced motion
+    if (!_reduceMotion && !_animationController!.isAnimating) {
+      _animationController!.forward();
+    }
 
     return AuthScaffold(
       child: FadeTransition(
-        opacity: _fadeAnimation,
+        opacity: _fadeAnimation!,
         child: SlideTransition(
-          position: _slideAnimation,
+          position: _slideAnimation!,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(textTheme),
-              const SizedBox(height: 30),
+              // ── Logo ──
+              const SizedBox(height: 48),
+              const Center(child: AuthBrandMark(size: 68)),
+
+              const SizedBox(height: 20),
+
+              // ── FarmMate AI brand text ──
+              Center(
+                child: Text(
+                  'FarmMate AI',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 36),
+
+              // ── Heading ──
+              Center(
+                child: Text(
+                  'Welcome back',
+                  style: textTheme.headlineLarge?.copyWith(
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // ── Subtitle ──
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 280),
+                  child: Text(
+                    'Sign in to continue caring for your farm.',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── Form card ──
               AuthCard(
                 child: AutofillGroup(
                   child: Form(
@@ -167,25 +243,48 @@ class _LoginScreenState extends State<LoginScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          child: errorMessage == null
-                              ? const SizedBox.shrink()
-                              : Column(
-                                  key: ValueKey(errorMessage),
-                                  children: [
-                                    AuthErrorBanner(
-                                      message: errorMessage,
-                                      semanticPrefix: 'Login error',
-                                    ),
-                                    const SizedBox(height: 18),
-                                  ],
-                                ),
-                        ),
+                        if (errorMessage != null) ...[
+                          AuthErrorBanner(
+                            message: errorMessage,
+                            semanticPrefix: 'Login error',
+                          ),
+                          const SizedBox(height: 18),
+                        ],
                         _buildIdentifierField(authProvider, isLoading),
                         const SizedBox(height: 14),
                         _buildPasswordField(authProvider, isLoading),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 8),
+                        // ── Forgot Password ──
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: isLoading
+                                ? null
+                                : () {
+                                    authProvider.clearError();
+                                    final prefillEmail = _extractEmail(
+                                      _identifierController.text,
+                                    );
+                                    context.go(
+                                      '/forgot-password',
+                                      extra: prefillEmail == null
+                                          ? null
+                                          : <String, String>{
+                                              'email': prefillEmail,
+                                            },
+                                    );
+                                  },
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            child: const Text('Forgot password?'),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
                         AuthPrimaryButton(
                           label: 'Sign in',
                           loadingLabel: 'Signing in...',
@@ -197,7 +296,10 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 22),
+
+              const SizedBox(height: 20),
+
+              // ── Footer link ──
               AuthFooter(
                 prompt: 'New to FarmMate?',
                 actionLabel: 'Create account',
@@ -208,17 +310,15 @@ class _LoginScreenState extends State<LoginScreen>
                         context.go('/register');
                       },
               ),
-              const SizedBox(height: 30),
-              Text(
-                'FARMING • INTELLIGENCE • SIMPLICITY',
-                textAlign: TextAlign.center,
-                style: textTheme.bodySmall?.copyWith(
-                  color: AppColors.textHint.withValues(alpha: 0.72),
-                  fontSize: 8.5,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.25,
-                ),
+
+              const SizedBox(height: 28),
+
+              // ── Brand chips ──
+              const Center(
+                child: BrandChips(),
               ),
+
+              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -226,34 +326,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildHeader(TextTheme textTheme) {
-    return Column(
-      children: [
-        const AuthBrandMark(size: 68),
-        const SizedBox(height: 22),
-        Text(
-          'Welcome back',
-          textAlign: TextAlign.center,
-          style: textTheme.headlineLarge?.copyWith(
-            color: AppColors.textPrimary,
-            letterSpacing: -0.8,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 300),
-          child: Text(
-            'Sign in to continue caring for your farm.',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(
-              color: AppColors.textSecondary,
-              height: 1.45,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // ─── Fields ─────────────────────────────────────────────────────────
 
   Widget _buildIdentifierField(AuthProvider authProvider, bool isLoading) {
     return TextFormField(
@@ -321,14 +394,10 @@ class _LoginScreenState extends State<LoginScreen>
         suffixIcon: IconButton(
           onPressed: isLoading ? null : _togglePasswordVisibility,
           tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            child: Icon(
-              _obscurePassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              key: ValueKey(_obscurePassword),
-            ),
+          icon: Icon(
+            _obscurePassword
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
         ),
       ),

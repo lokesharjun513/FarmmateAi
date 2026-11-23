@@ -30,13 +30,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   final _passwordFocusNode = FocusNode();
   final _confirmPasswordFocusNode = FocusNode();
 
-  late final AnimationController _animationController;
-  late final Animation<double> _headerFade;
-  late final Animation<Offset> _headerSlide;
-  late final Animation<double> _formFade;
-  late final Animation<Offset> _formSlide;
-  late final Animation<double> _footerFade;
-
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
@@ -46,48 +39,9 @@ class _RegisterScreenState extends State<RegisterScreen>
   void initState() {
     super.initState();
 
-    _passwordController.addListener(_onPasswordChanged);
-    _confirmPasswordController.addListener(_onConfirmPasswordChanged);
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 580),
-    );
-
-    _headerFade = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0, 0.6, curve: Curves.easeOut),
-    );
-
-    _headerSlide = Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: const Interval(0, 0.7, curve: Curves.easeOutCubic),
-          ),
-        );
-
-    _formFade = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.12, 0.9, curve: Curves.easeOut),
-    );
-
-    _formSlide = Tween<Offset>(begin: const Offset(0, 0.035), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: _animationController,
-            curve: const Interval(0.1, 0.9, curve: Curves.easeOutCubic),
-          ),
-        );
-
-    _footerFade = CurvedAnimation(
-      parent: _animationController,
-      curve: const Interval(0.5, 1, curve: Curves.easeOut),
-    );
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_reduceMotion) {
-        _animationController.forward();
+        // Animation started via didChangeDependencies
       }
     });
   }
@@ -105,27 +59,9 @@ class _RegisterScreenState extends State<RegisterScreen>
     _reduceMotion = reduceMotion;
 
     if (_reduceMotion) {
-      _animationController.value = 1;
+      // Skip animations when reduced motion is enabled
       return;
     }
-
-    _animationController.forward();
-  }
-
-  void _onPasswordChanged() {
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {});
-  }
-
-  void _onConfirmPasswordChanged() {
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {});
   }
 
   @override
@@ -133,7 +69,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     _passwordController.removeListener(_onPasswordChanged);
     _confirmPasswordController.removeListener(_onConfirmPasswordChanged);
 
-    _animationController.dispose();
+    _animationController?.dispose();
 
     _fullNameController.dispose();
     _mobileController.dispose();
@@ -148,6 +84,16 @@ class _RegisterScreenState extends State<RegisterScreen>
     _confirmPasswordFocusNode.dispose();
 
     super.dispose();
+  }
+
+  void _onPasswordChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _onConfirmPasswordChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   Future<void> _handleRegister() async {
@@ -167,15 +113,40 @@ class _RegisterScreenState extends State<RegisterScreen>
 
     final authProvider = context.read<AuthProvider>();
 
-    var success = false;
-
     try {
-      success = await authProvider.register(
+      await authProvider.register(
         fullName: _fullNameController.text.trim(),
         mobile: _mobileController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+
+      if (!mounted) return;
+
+      final messenger = ScaffoldMessenger.of(context);
+
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 20,
+                  color: Colors.white,
+                ),
+                SizedBox(width: 10),
+                Expanded(child: Text('Account created. Sign in to continue.')),
+              ],
+            ),
+          ),
+        );
+
+      context.go('/login');
+    } catch (e) {
+      if (!mounted) return;
+      // AuthProvider handles error internally
     } finally {
       if (mounted) {
         setState(() {
@@ -183,116 +154,29 @@ class _RegisterScreenState extends State<RegisterScreen>
         });
       }
     }
-
-    if (!mounted || !success) {
-      return;
-    }
-
-    final messenger = ScaffoldMessenger.of(context);
-
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                Icons.check_circle_outline_rounded,
-                size: 20,
-                color: Colors.white,
-              ),
-              SizedBox(width: 10),
-              Expanded(child: Text('Account created. Sign in to continue.')),
-            ],
-          ),
-        ),
-      );
-
-    context.go('/login');
   }
 
   void _togglePasswordVisibility() {
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
       _obscurePassword = !_obscurePassword;
     });
   }
 
   void _toggleConfirmPasswordVisibility() {
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
       _obscureConfirmPassword = !_obscureConfirmPassword;
     });
   }
 
-  int _passwordStrengthScore(String password) {
-    if (password.isEmpty) {
-      return 0;
-    }
-
-    var score = 0;
-
-    if (password.length >= 8) {
-      score++;
-    }
-
-    if (RegExp(r'[a-z]').hasMatch(password)) {
-      score++;
-    }
-
-    if (RegExp(r'[A-Z]').hasMatch(password)) {
-      score++;
-    }
-
-    if (RegExp(r'\d').hasMatch(password)) {
-      score++;
-    }
-
-    if (RegExp(r'[^\w\s]').hasMatch(password)) {
-      score++;
-    }
-
-    return score;
-  }
-
-  String _passwordStrengthLabel(int score) {
-    if (score <= 1) {
-      return 'Weak';
-    }
-
-    if (score <= 3) {
-      return 'Good';
-    }
-
-    return 'Strong';
-  }
-
-  Color _passwordStrengthColor(int score) {
-    if (score <= 1) {
-      return AppColors.error;
-    }
-
-    if (score <= 3) {
-      return AppColors.warning;
-    }
-
-    return AppColors.success;
-  }
-
-  bool get _hasPasswordMatchText {
-    return _confirmPasswordController.text.isNotEmpty;
-  }
-
-  bool get _passwordsMatch {
-    return _hasPasswordMatchText &&
-        _passwordController.text == _confirmPasswordController.text;
-  }
+  // Animation controller for subtle entrance
+  AnimationController? _animationController;
+  Animation<double>? _headerFade;
+  Animation<Offset>? _headerSlide;
+  Animation<double>? _formFade;
+  Animation<Offset>? _formSlide;
+  Animation<double>? _footerFade;
 
   @override
   Widget build(BuildContext context) {
@@ -301,23 +185,76 @@ class _RegisterScreenState extends State<RegisterScreen>
     final textTheme = Theme.of(context).textTheme;
     final isCompact = MediaQuery.sizeOf(context).width < 380;
 
+    // Build animation controller if not created
+    if (_animationController == null) {
+      _animationController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 580),
+      );
+
+      _headerFade = CurvedAnimation(
+        parent: _animationController!,
+        curve: const Interval(0, 0.6, curve: Curves.easeOut),
+      );
+
+      _headerSlide =
+          Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(
+            CurvedAnimation(
+              parent: _animationController!,
+              curve: const Interval(0, 0.7, curve: Curves.easeOutCubic),
+            ),
+          );
+
+      _formFade = CurvedAnimation(
+        parent: _animationController!,
+        curve: const Interval(0.12, 0.9, curve: Curves.easeOut),
+      );
+
+      _formSlide =
+          Tween<Offset>(
+            begin: const Offset(0, 0.035),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(
+              parent: _animationController!,
+              curve: const Interval(0.1, 0.9, curve: Curves.easeOutCubic),
+            ),
+          );
+
+      _footerFade = CurvedAnimation(
+        parent: _animationController!,
+        curve: const Interval(0.5, 1, curve: Curves.easeOut),
+      );
+
+      _animationController!.forward();
+    }
+
+    // Start animation if not in reduced motion
+    if (!_reduceMotion && !_animationController!.isAnimating) {
+      _animationController!.forward();
+    }
+
     return AuthScaffold(
       maxWidth: 460,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ── Header: back button + branding ──
           FadeTransition(
-            opacity: _headerFade,
+            opacity: _headerFade!,
             child: SlideTransition(
-              position: _headerSlide,
-              child: _buildHeader(textTheme),
+              position: _headerSlide!,
+              child: _buildHeader(context, authProvider, textTheme),
             ),
           ),
+
           const SizedBox(height: 28),
+
+          // ── Form card ──
           FadeTransition(
-            opacity: _formFade,
+            opacity: _formFade!,
             child: SlideTransition(
-              position: _formSlide,
+              position: _formSlide!,
               child: AuthCard(
                 padding: EdgeInsets.all(isCompact ? 20 : 24),
                 child: AutofillGroup(
@@ -326,21 +263,16 @@ class _RegisterScreenState extends State<RegisterScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          child: authProvider.errorMessage == null
-                              ? const SizedBox.shrink()
-                              : Column(
-                                  key: ValueKey(authProvider.errorMessage),
-                                  children: [
-                                    AuthErrorBanner(
-                                      message: authProvider.errorMessage!,
-                                      semanticPrefix: 'Registration error',
-                                    ),
-                                    const SizedBox(height: 20),
-                                  ],
-                                ),
-                        ),
+                        // Error banner
+                        if (authProvider.errorMessage != null) ...[
+                          AuthErrorBanner(
+                            message: authProvider.errorMessage!,
+                            semanticPrefix: 'Registration error',
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Section: Your details
                         _buildSectionLabel(textTheme, 'Your details'),
                         const SizedBox(height: 14),
                         _buildFullNameField(authProvider, isLoading),
@@ -348,23 +280,31 @@ class _RegisterScreenState extends State<RegisterScreen>
                         _buildMobileField(authProvider, isLoading),
                         const SizedBox(height: 14),
                         _buildEmailField(authProvider, isLoading),
+
                         const SizedBox(height: 26),
                         const Divider(height: 1),
                         const SizedBox(height: 24),
+
+                        // Section: Secure your account
                         _buildSectionLabel(textTheme, 'Secure your account'),
                         const SizedBox(height: 14),
                         _buildPasswordField(authProvider, isLoading),
+
                         if (_passwordController.text.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           _buildPasswordStrength(textTheme),
                         ],
+
                         const SizedBox(height: 14),
                         _buildConfirmPasswordField(authProvider, isLoading),
-                        if (_hasPasswordMatchText) ...[
+
+                        if (_confirmPasswordController.text.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           _buildPasswordMatchFeedback(textTheme),
                         ],
+
                         const SizedBox(height: 24),
+
                         AuthPrimaryButton(
                           label: 'Create account',
                           loadingLabel: 'Creating account...',
@@ -378,9 +318,12 @@ class _RegisterScreenState extends State<RegisterScreen>
               ),
             ),
           ),
-          const SizedBox(height: 22),
+
+          const SizedBox(height: 20),
+
+          // ── Footer ──
           FadeTransition(
-            opacity: _footerFade,
+            opacity: _footerFade!,
             child: AuthFooter(
               prompt: 'Already have an account?',
               actionLabel: 'Sign in',
@@ -392,19 +335,37 @@ class _RegisterScreenState extends State<RegisterScreen>
                     },
             ),
           ),
+
+          const SizedBox(height: 28),
         ],
       ),
     );
   }
 
-  Widget _buildHeader(TextTheme textTheme) {
+  Widget _buildHeader(BuildContext context, AuthProvider authProvider, TextTheme textTheme) {
+    final isLoading = _isSubmitting || authProvider.isLoading;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Top row: back button + branding ──
         Row(
           children: [
-            const AuthBrandMark(size: 46),
+            // Back button
+            _BackButton(
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      authProvider.clearError();
+                      context.go('/login');
+                    },
+            ),
+
             const SizedBox(width: 12),
+
+            const AuthBrandMark(size: 44),
+
+            const SizedBox(width: 12),
+
             Expanded(
               child: Text(
                 'FarmMate AI',
@@ -417,7 +378,10 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
           ],
         ),
+
         const SizedBox(height: 26),
+
+        // ── Heading ──
         Text(
           'Create your account',
           style: textTheme.headlineLarge?.copyWith(
@@ -425,7 +389,9 @@ class _RegisterScreenState extends State<RegisterScreen>
             letterSpacing: -0.8,
           ),
         ),
+
         const SizedBox(height: 9),
+
         ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: Text(
@@ -529,7 +495,6 @@ class _RegisterScreenState extends State<RegisterScreen>
       autofillHints: const [AutofillHints.email],
       autocorrect: false,
       enableSuggestions: false,
-      textCapitalization: TextCapitalization.none,
       onChanged: (_) => authProvider.clearError(),
       decoration: const InputDecoration(
         labelText: 'Email address',
@@ -581,19 +546,17 @@ class _RegisterScreenState extends State<RegisterScreen>
         suffixIcon: IconButton(
           onPressed: isLoading ? null : _togglePasswordVisibility,
           tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            child: Icon(
-              _obscurePassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              key: ValueKey(_obscurePassword),
-            ),
+          icon: Icon(
+            _obscurePassword
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
         ),
       ),
       validator: (value) {
-        if (value == null || value.length < 8) {
+        final text = value ?? '';
+
+        if (text.length < 8) {
           return 'Password must be at least 8 characters';
         }
 
@@ -629,14 +592,10 @@ class _RegisterScreenState extends State<RegisterScreen>
           tooltip: _obscureConfirmPassword
               ? 'Show confirmation password'
               : 'Hide confirmation password',
-          icon: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            child: Icon(
-              _obscureConfirmPassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              key: ValueKey(_obscureConfirmPassword),
-            ),
+          icon: Icon(
+            _obscureConfirmPassword
+                ? Icons.visibility_off_outlined
+                : Icons.visibility_outlined,
           ),
         ),
       ),
@@ -661,93 +620,71 @@ class _RegisterScreenState extends State<RegisterScreen>
 
   Widget _buildPasswordStrength(TextTheme textTheme) {
     final password = _passwordController.text;
-    final score = _passwordStrengthScore(password);
-    final strengthColor = _passwordStrengthColor(score);
-    final label = _passwordStrengthLabel(score);
+    if (password.isEmpty) return const SizedBox.shrink();
+
+    var score = 0;
+
+    if (password.length >= 8) {
+      score++;
+    }
+
+    if (RegExp(r'[a-z]').hasMatch(password)) {
+      score++;
+    }
+
+    if (RegExp(r'[A-Z]').hasMatch(password)) {
+      score++;
+    }
+
+    if (RegExp(r'\d').hasMatch(password)) {
+      score++;
+    }
+
+    if (RegExp(r'[^\w\s]').hasMatch(password)) {
+      score++;
+    }
+
+    final strengthColor = score <= 1
+        ? AppColors.error
+        : score <= 3
+        ? AppColors.warning
+        : AppColors.success;
+
+    final label = score <= 1
+        ? 'Weak'
+        : score <= 3
+        ? 'Good'
+        : 'Strong';
 
     return Semantics(
       liveRegion: true,
       label: 'Password strength: $label',
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Password strength',
-                    style: textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  child: Text(
-                    label,
-                    key: ValueKey(label),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: strengthColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: List.generate(5, (index) {
-                final isActive = index < score;
-
-                return Expanded(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    height: 4,
-                    margin: EdgeInsets.only(right: index == 4 ? 0 : 4),
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? strengthColor
-                          : AppColors.borderLight.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPasswordMatchFeedback(TextTheme textTheme) {
-    final matches = _passwordsMatch;
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 180),
       child: Row(
-        key: ValueKey(matches),
         children: [
-          Icon(
-            matches
-                ? Icons.check_circle_outline_rounded
-                : Icons.info_outline_rounded,
-            size: 17,
-            color: matches ? AppColors.success : AppColors.error,
-          ),
-          const SizedBox(width: 7),
           Expanded(
             child: Text(
-              matches ? 'Passwords match' : 'Passwords do not match',
+              'Password strength',
               style: textTheme.bodySmall?.copyWith(
-                color: matches ? AppColors.success : AppColors.error,
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 24,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.borderLight.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: score * 4.8, // 5 bars * ~4.8px each with slight gap
+              decoration: BoxDecoration(
+                color: strengthColor,
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
           ),
@@ -755,4 +692,71 @@ class _RegisterScreenState extends State<RegisterScreen>
       ),
     );
   }
+
+  Widget _buildPasswordMatchFeedback(TextTheme textTheme) {
+    final matches =
+        _passwordController.text == _confirmPasswordController.text &&
+        _confirmPasswordController.text.isNotEmpty;
+
+    return Row(
+      children: [
+        Icon(
+          matches
+              ? Icons.check_circle_outline_rounded
+              : Icons.info_outline_rounded,
+          size: 17,
+          color: matches ? AppColors.success : AppColors.error,
+        ),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            matches ? 'Passwords match' : 'Passwords do not match',
+            style: textTheme.bodySmall?.copyWith(
+              color: matches ? AppColors.success : AppColors.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+// ─── Back Button ──────────────────────────────────────────────────────
+
+class _BackButton extends StatelessWidget {
+  const _BackButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Go back',
+      child: Material(
+        color: AppColors.surfaceLight,
+        shape: const CircleBorder(),
+        elevation: 0,
+        child: InkWell(
+          onTap: onPressed,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+

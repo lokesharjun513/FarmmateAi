@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../weather/providers/weather_provider.dart';
 import '../../data/models/dashboard_model.dart';
 import '../../providers/dashboard_provider.dart';
 

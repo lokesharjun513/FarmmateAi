@@ -1,10 +1,22 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConfig {
   ApiConfig._();
 
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://192.168.1.5:8000/api/v1',
-  );
+  // === Authentication ===
+  // Override per run: --dart-define=API_BASE_URL=http://<host>:8000/api/v1
+  // (required for physical Android/iOS devices on Wi-Fi).
+  // Defaults: web/desktop/iOS simulator use 127.0.0.1; the Android emulator
+  // reaches the host machine's localhost via 10.0.2.2.
+  static String get baseUrl {
+    const override = String.fromEnvironment('API_BASE_URL');
+    if (override.isNotEmpty) return override;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000/api/v1';
+    }
+    return 'http://127.0.0.1:8000/api/v1';
+  }
+
 
   static const Duration connectTimeout = Duration(seconds: 15);
   static const Duration sendTimeout = Duration(seconds: 15);
@@ -17,6 +29,12 @@ class ApiConfig {
   static const String register = '/auth/register';
   static const String login = '/auth/login';
   static const String me = '/auth/me';
+
+  // Password reset
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String verifyResetOtp = '/auth/verify-reset-otp';
+  static const String resendResetOtp = '/auth/resend-reset-otp';
+  static const String resetPassword = '/auth/reset-password';
 
   // Farmer
   static const String farmerProfile = '/farmer/profile';
@@ -100,4 +118,5 @@ class ApiConfig {
   static String deviceToken(String fid) {
     return '/notifications/devices/${Uri.encodeComponent(fid.trim())}';
   }
+
 }
