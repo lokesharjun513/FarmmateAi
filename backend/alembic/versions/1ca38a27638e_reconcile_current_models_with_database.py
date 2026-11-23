@@ -88,27 +88,27 @@ def upgrade() -> None:
     )
 
     # ========================================================
-    # 2. ASK FM ROLE
+    # 2. ASK FM ROLE AND SESSION STATUS
     #
-    # IMPORTANT:
-    #
-    # The current database already has:
-    #
-    #     ask_fm_role
-    #
-    # with:
-    #
-    #     USER
-    #     ASSISTANT
-    #
-    # Therefore we DO NOT rename or recreate this enum.
-    #
-    # The current SQLAlchemy model additionally supports:
-    #
-    #     SYSTEM
-    #
-    # So only SYSTEM is added.
+    # Ensure askfmrole and askfmsessionstatus are renamed to
+    # underscored names if they exist from earlier migrations,
+    # then add SYSTEM to ask_fm_role.
     # ========================================================
+
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'askfmrole') THEN
+                ALTER TYPE askfmrole RENAME TO ask_fm_role;
+            END IF;
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'askfmsessionstatus') THEN
+                ALTER TYPE askfmsessionstatus RENAME TO ask_fm_session_status;
+            END IF;
+        END
+        $$;
+        """
+    )
 
     op.execute(
         """
