@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../weather/data/models/weather_model.dart';
 import '../../../weather/providers/weather_provider.dart';
 import '../../data/models/dashboard_model.dart';
 import '../../providers/dashboard_provider.dart';
@@ -62,10 +63,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DashboardProvider>();
+    final weatherProvider = context.watch<WeatherProvider>();
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: SafeArea(child: _buildBody(provider)),
+      body: SafeArea(child: _buildBody(provider, weatherProvider)),
     );
   }
 
@@ -73,7 +75,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // BODY
   // ============================================================
 
-  Widget _buildBody(DashboardProvider provider) {
+  Widget _buildBody(
+    DashboardProvider provider,
+    WeatherProvider weatherProvider,
+  ) {
     // ----------------------------------------------------------
     // INITIAL LOADING
     // ----------------------------------------------------------
@@ -138,7 +143,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // ------------------------------------------------
                 // WEATHER
                 // ------------------------------------------------
-                _buildWeatherCard(dashboard.weather),
+                _buildWeatherCard(
+                  dashboard.weather,
+                  fallback: weatherProvider.weather,
+                ),
 
                 const SizedBox(height: 18),
 
@@ -465,8 +473,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // WEATHER
   // ============================================================
 
-  Widget _buildWeatherCard(WeatherDashboard weather) {
-    final unavailable = !weather.isAvailable;
+  Widget _buildWeatherCard(
+    WeatherDashboard weather, {
+    CurrentWeatherModel? fallback,
+  }) {
+    // When the dashboard's weather card is unavailable but a
+    // previous weather observation is still held in state, render
+    // that last observation instead of the "unavailable" state.
+    final hasFallback = fallback != null;
+
+    final unavailable = !weather.isAvailable && !hasFallback;
+
+    final temperature = hasFallback
+        ? fallback.temperature
+        : weather.temperature;
+
+    final condition = hasFallback
+        ? fallback.weatherCondition
+        : weather.condition;
+
+    final humidity = hasFallback
+        ? (fallback.humidity ?? 0)
+        : weather.humidity;
+
+    final rainProbability = hasFallback
+        ? fallback.rainProbability
+        : weather.rainProbability;
 
     return _card(
       child: Column(
@@ -528,7 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Row(
               children: [
                 Text(
-                  '${weather.temperature.toStringAsFixed(0)}°',
+                  '${temperature.toStringAsFixed(0)}°',
                   style: const TextStyle(
                     color: AppColors.primaryDark,
                     fontSize: 36,
@@ -540,7 +572,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 Expanded(
                   child: Text(
-                    weather.condition,
+                    condition,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -559,7 +591,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _weatherInfo(
                   Icons.water_drop_outlined,
-                  '${weather.humidity.toStringAsFixed(0)}%',
+                  '$humidity%',
                   'Humidity',
                 ),
 
@@ -567,9 +599,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                 _weatherInfo(
                   Icons.umbrella_outlined,
-                  weather.rainProbability == null
+                  rainProbability == null
                       ? '--'
-                      : '${weather.rainProbability!.toStringAsFixed(0)}%',
+                      : '${rainProbability.toStringAsFixed(0)}%',
                   'Rain',
                 ),
               ],

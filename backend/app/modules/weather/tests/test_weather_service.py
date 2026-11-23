@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 
+from app.modules.weather.cache import WeatherCache
 from app.modules.weather.service import WeatherService
 from app.modules.weather.schemas import (
     CurrentWeatherResponse,
@@ -76,12 +77,13 @@ async def test_get_current_weather_success():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
-    result = await service.get_current_weather(
+    result = (await service.get_current_weather(
         latitude=14.4426,
         longitude=79.9865,
-    )
+    )).data
 
     assert isinstance(
         result,
@@ -140,6 +142,7 @@ async def test_get_current_weather_calls_providers_with_coordinates():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
     await service.get_current_weather(
@@ -172,12 +175,13 @@ async def test_get_current_weather_handles_missing_current_data():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
-    result = await service.get_current_weather(
+    result = (await service.get_current_weather(
         latitude=14.0,
         longitude=79.0,
-    )
+    )).data
 
     assert result.temperature == 0
     assert result.wind_speed == 0
@@ -207,12 +211,13 @@ async def test_get_current_weather_handles_empty_daily_data():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
-    result = await service.get_current_weather(
+    result = (await service.get_current_weather(
         latitude=14.0,
         longitude=79.0,
-    )
+    )).data
 
     assert result.rain_probability is None
     assert result.sunrise is None
@@ -242,12 +247,13 @@ async def test_get_current_weather_handles_empty_daily_lists():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
-    result = await service.get_current_weather(
+    result = (await service.get_current_weather(
         latitude=14.0,
         longitude=79.0,
-    )
+    )).data
 
     assert result.rain_probability is None
     assert result.sunrise is None
@@ -328,6 +334,7 @@ async def test_get_weather_recommendation_heavy_rain():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
     result = await service.get_weather_recommendation(
@@ -369,6 +376,7 @@ async def test_get_weather_recommendation_high_temperature():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
     result = await service.get_weather_recommendation(
@@ -405,6 +413,7 @@ async def test_get_weather_recommendation_normal_weather():
     service = WeatherService(
         weather_provider=weather_provider,
         location_provider=location_provider,
+        cache=WeatherCache(),
     )
 
     result = await service.get_weather_recommendation(

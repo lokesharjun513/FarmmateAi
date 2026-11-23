@@ -138,11 +138,13 @@ class AIContextBuilder:
             return None
 
         try:
-            return await self.weather_service.get_current_weather(
-                latitude=farm.latitude,
-                longitude=farm.longitude,
-                location=location,
-            )
+            return (
+                await self.weather_service.get_current_weather(
+                    latitude=farm.latitude,
+                    longitude=farm.longitude,
+                    location=location,
+                )
+            ).data
 
         except Exception:
             logger.exception(

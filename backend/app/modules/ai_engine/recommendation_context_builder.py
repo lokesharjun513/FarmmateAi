@@ -52,11 +52,11 @@ class RecommendationContextBuilder:
             farm,
         )
 
-        weather = await self.weather_service.get_current_weather(
+        weather = (await self.weather_service.get_current_weather(
             latitude=farm.latitude,
             longitude=farm.longitude,
             location=location,
-        )
+        )).data
 
         return RecommendationContext(
             state=farm.state,

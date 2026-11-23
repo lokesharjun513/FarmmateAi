@@ -14,6 +14,7 @@ from app.shared.exceptions import (
     MobileAlreadyExistsError,
     UnauthorizedError,
     ValidationError,
+    WeatherServiceError,
 )
 
 
@@ -185,6 +186,23 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "message": (
                     "AI service is temporarily unavailable. "
                     "Please try again."
+                ),
+                "errors": [],
+            },
+        )
+
+    @app.exception_handler(WeatherServiceError)
+    async def weather_service_exception_handler(
+        request: Request,
+        exc: WeatherServiceError,
+    ):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "success": False,
+                "message": (
+                    "Weather service is temporarily unavailable. "
+                    "Please try again later."
                 ),
                 "errors": [],
             },

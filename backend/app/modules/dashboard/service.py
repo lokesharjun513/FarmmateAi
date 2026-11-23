@@ -332,7 +332,7 @@ class DashboardService:
                         f"{farm.district}"
                     ),
                 )
-            )
+            ).data
 
             return WeatherCard(
                 temperature=float(

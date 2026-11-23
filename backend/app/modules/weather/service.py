@@ -1,3 +1,10 @@
+from dataclasses import dataclass
+
+from app.modules.weather.cache import (
+    WeatherCache,
+    build_weather_cache_key,
+    default_weather_cache,
+)
 from app.modules.weather.provider import WeatherProvider
 from app.modules.weather.location_provider import LocationProvider
 from app.modules.weather.schemas import (
@@ -6,12 +13,26 @@ from app.modules.weather.schemas import (
 )
 
 
+@dataclass(frozen=True)
+class WeatherResult:
+    """
+    Result of a current-weather lookup.
+
+    ``stale`` is True when the response was rebuilt from the last
+    successful observation because the upstream fetch failed.
+    """
+
+    data: CurrentWeatherResponse
+    stale: bool = False
+
+
 class WeatherService:
 
     def __init__(
         self,
         weather_provider: WeatherProvider | None = None,
         location_provider: LocationProvider | None = None,
+        cache: WeatherCache | None = None,
     ):
         self.weather_provider = (
             weather_provider or WeatherProvider()
@@ -21,11 +42,39 @@ class WeatherService:
             location_provider or LocationProvider()
         )
 
+        # Shared across all WeatherService instances (services are
+        # created per request), so cached weather survives requests.
+        self.cache = cache or default_weather_cache
+
     async def get_current_weather(
         self,
         latitude: float,
         longitude: float,
         location: str | None = None,
+    ) -> WeatherResult:
+
+        key = build_weather_cache_key(latitude, longitude)
+
+        result = await self.cache.get_or_fetch(
+            key,
+            lambda: self._fetch_and_build(
+                latitude=latitude,
+                longitude=longitude,
+                location=location,
+            ),
+        )
+
+        return WeatherResult(
+            data=result.data,
+            stale=result.stale,
+        )
+
+    async def _fetch_and_build(
+        self,
+        *,
+        latitude: float,
+        longitude: float,
+        location: str | None,
     ) -> CurrentWeatherResponse:
 
         # ------------------------------------------------------
@@ -202,11 +251,11 @@ class WeatherService:
         location: str | None = None,
     ) -> WeatherRecommendationResponse:
 
-        weather = await self.get_current_weather(
+        weather = (await self.get_current_weather(
             latitude=latitude,
             longitude=longitude,
             location=location,
-        )
+        )).data
 
         # Basic recommendation for now.
         # We can make this AI/farming-specific later.

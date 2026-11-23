@@ -39,16 +39,25 @@ async def current_weather(
 
     service = WeatherService()
 
-    weather = await service.get_current_weather(
+    weather_result = await service.get_current_weather(
         latitude=latitude,
         longitude=longitude,
         location=location,
     )
 
+    message = "Current weather retrieved successfully."
+
+    if weather_result.stale:
+        message = (
+            "Current weather retrieved successfully. "
+            "Showing last available weather data "
+            "(may be up to 6 hours old)."
+        )
+
     return ApiResponse(
         success=True,
-        message="Current weather retrieved successfully.",
-        data=weather,
+        message=message,
+        data=weather_result.data,
     )
 
 

@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.modules.weather.router import router
+from app.modules.weather.service import WeatherResult
 from app.modules.weather.schemas import (
     CurrentWeatherResponse,
     WeatherRecommendationResponse,
@@ -61,7 +62,9 @@ class MockWeatherService:
         location: str | None = None,
     ):
 
-        return create_current_weather()
+        return WeatherResult(
+            data=create_current_weather(),
+        )
 
     async def get_weather_recommendation(
         self,

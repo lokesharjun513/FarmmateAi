@@ -89,11 +89,11 @@ class AdvisorService:
             )
         )
 
-        weather = await self.weather_service.get_current_weather(
+        weather = (await self.weather_service.get_current_weather(
             latitude=farm.latitude,
             longitude=farm.longitude,
             location=location,
-        )
+        )).data
 
         context = AIContext(
             crop_name=crop.crop_name,
